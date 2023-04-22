@@ -1,0 +1,8 @@
+kind: Networktest
+apiVersion: edgeworks.no/v1
+metadata:
+  name: vg.no
+spec:
+  address: https://www.vg.no
+  type: http
+  interval: 5m

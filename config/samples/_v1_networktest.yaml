@@ -1,0 +1,12 @@
+apiVersion: edgeworks.no/v1
+kind: Networktest
+metadata:
+  labels:
+    app.kubernetes.io/name: networktest
+    app.kubernetes.io/instance: networktest-sample
+    app.kubernetes.io/part-of: networktester
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: networktester
+  name: networktest-sample
+spec:
+  # TODO(user): Add fields here

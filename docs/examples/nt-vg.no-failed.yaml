@@ -1,0 +1,7 @@
+kind: Networktest
+apiVersion: edgeworks.no/v1
+metadata:
+  name: vg.no-failed
+spec:
+  address: https://www.vg.nooo
+  type: http

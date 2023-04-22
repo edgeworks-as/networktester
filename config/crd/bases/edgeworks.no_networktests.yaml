@@ -1,0 +1,73 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: networktests.edgeworks.no
+spec:
+  group: edgeworks.no
+  names:
+    kind: Networktest
+    listKind: NetworktestList
+    plural: networktests
+    singular: networktest
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: Networktest is the Schema for the networktests API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NetworktestSpec defines the desired state of Networktest
+            properties:
+              address:
+                type: string
+              interval:
+                type: string
+              type:
+                enum:
+                - dial
+                - tcp
+                - http
+                type: string
+            required:
+            - address
+            - interval
+            - type
+            type: object
+          status:
+            description: NetworktestStatus defines the observed state of Networktest
+            properties:
+              accepted:
+                type: boolean
+              lastResult:
+                type: string
+              lastRun:
+                format: date-time
+                type: string
+              message:
+                type: string
+              nextRun:
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
