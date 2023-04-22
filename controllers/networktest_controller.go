@@ -18,12 +18,15 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,7 +62,7 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	var test edgeworksnov1.Networktest
 	if err := r.Get(ctx, req.NamespacedName, &test); err != nil {
-		if errors.IsNotFound(err) {
+		if k8errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 
@@ -72,12 +75,25 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	if !test.Status.Accepted {
 		// Verify and set status
-		if test.Spec.Address != "" {
-			test.Status.Accepted = true
-			if err := r.Status().Update(ctx, &test); err != nil {
-				ctrl.Log.Error(err, "Failed to update status of Networktest")
-				return ctrl.Result{}, err
+		if test.Spec.Http != nil && test.Spec.Http.URL != "" {
+			if _, err := url.Parse(test.Spec.Http.URL); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to parse URL: %v", err)
 			}
+		} else if test.Spec.TCP != nil && test.Spec.TCP.Address != "" {
+			if addr := net.ParseIP(test.Spec.TCP.Address); addr == nil {
+				return ctrl.Result{}, fmt.Errorf("failed to parse IP: %s", test.Spec.TCP.Address)
+			}
+
+			if test.Spec.TCP.Port <= 0 {
+				return ctrl.Result{}, fmt.Errorf("invalid port: %d", test.Spec.TCP.Port)
+			}
+		}
+
+		test.Status.Accepted = true
+
+		if err := r.Status().Update(ctx, &test); err != nil {
+			ctrl.Log.Error(err, "Failed to update status of Networktest")
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -102,11 +118,10 @@ func (r *NetworktestReconciler) tester() {
 
 			var result testResult
 
-			switch t.Spec.Type {
-			case "http":
+			if t.Spec.Http != nil {
 				result = doHttpTest(t)
-			default:
-				ctrl.Log.Info(fmt.Sprintf("Don't know how to perform test of type %s", t.Spec.Type))
+			} else {
+				ctrl.Log.Info("Unknown probe type")
 				continue
 			}
 
@@ -151,11 +166,11 @@ func (t testResult) String() *string {
 }
 
 func doHttpTest(t *edgeworksnov1.Networktest) testResult {
-
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+	timeout, _ := time.ParseDuration(fmt.Sprintf("%ds", t.Spec.Timeout))
+	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 	defer cancelFunc()
 
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Spec.Address, nil)
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Spec.Http.URL, nil)
 	if err != nil {
 		return testResult{
 			success: false,
@@ -167,6 +182,13 @@ func doHttpTest(t *edgeworksnov1.Networktest) testResult {
 	res, err := c.Do(r)
 
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return testResult{
+				success: false,
+				message: fmt.Errorf("timeout: %v", err).Error(),
+			}
+		}
+
 		return testResult{
 			success: false,
 			message: err.Error(),
@@ -175,7 +197,7 @@ func doHttpTest(t *edgeworksnov1.Networktest) testResult {
 
 	return testResult{
 		success: res.StatusCode == 200,
-		message: res.Status,
+		message: fmt.Sprintf("http result: %s", res.Status),
 	}
 }
 

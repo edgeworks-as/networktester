@@ -1,9 +1,9 @@
 kind: Networktest
 apiVersion: edgeworks.no/v1
 metadata:
-  name: vg.no
+  name: timeout
 spec:
   interval: 5m
   timeout: 5
   http:
-    url: https://www.vg.no
+    url: https://www.google.com:81

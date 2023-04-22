@@ -35,20 +35,30 @@ spec:
           spec:
             description: NetworktestSpec defines the desired state of Networktest
             properties:
-              address:
-                type: string
+              http:
+                properties:
+                  url:
+                    type: string
+                required:
+                - url
+                type: object
               interval:
                 type: string
-              type:
-                enum:
-                - dial
-                - tcp
-                - http
-                type: string
+              tcp:
+                properties:
+                  address:
+                    type: string
+                  port:
+                    type: integer
+                required:
+                - address
+                - port
+                type: object
+              timeout:
+                type: integer
             required:
-            - address
             - interval
-            - type
+            - timeout
             type: object
           status:
             description: NetworktestStatus defines the observed state of Networktest

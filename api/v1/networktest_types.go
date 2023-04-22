@@ -22,11 +22,23 @@ import (
 
 // NetworktestSpec defines the desired state of Networktest
 type NetworktestSpec struct {
-
-	// +kubebuilder:validation:Enum:={"dial","tcp","http"}
-	Type     string `json:"type"`
-	Address  string `json:"address"`
 	Interval string `json:"interval"` // Default 1h
+	Timeout  int    `json:"timeout"`
+
+	// +optional
+	Http *HttpProbe `json:"http"`
+
+	// +optional
+	TCP *TCPProbe `json:"tcp"`
+}
+
+type HttpProbe struct {
+	URL string `json:"url"`
+}
+
+type TCPProbe struct {
+	Address string `json:"address"`
+	Port    int    `json:"port"`
 }
 
 func (s NetworktestSpec) GetInterval() string {
