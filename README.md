@@ -8,7 +8,9 @@ Networktester runs as a controller in the Kubernetes cluster.
 
 It will handle custom resources of type "Networktest" and probe them periodically according to the defined interval.
 
-Example using http probe:
+### Defining the probe
+
+Using **HTTP** probe:
 
 ```yaml
 apiVersion: edgeworks.no/v1
@@ -22,7 +24,7 @@ spec:
     url: https://www.vg.no
 ```
 
-Example using TCP probe:
+Using **TCP** probe:
 ```yaml
 kind: Networktest
 apiVersion: edgeworks.no/v1
@@ -34,10 +36,14 @@ spec:
   tcp:
     address: 192.168.0.1
     port: 443
-    data: "test"
+    data: "test" # Optional: Write the data after opening socket
 ```
 
-The probe results are written back to the resource status field.
+**Tip**: Azure Firewall will prevent detection of blocking firewalls if we do not try to send any data 
+after opening the socket. The value defined in "data" will be written to the socket after opening. Leave it
+empty to disable this feature.
+
+### The probe results are written back to the resource status field.
 
 Success:
 
