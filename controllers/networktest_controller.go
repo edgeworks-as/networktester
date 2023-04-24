@@ -18,14 +18,13 @@ package controllers
 
 import (
 	"context"
-	"errors"
+	"edgeworks.no/networktester/pkg/testers"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net"
-	"net/http"
 	"net/url"
 	"time"
 
@@ -41,7 +40,18 @@ import (
 type NetworktestReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	Tests  map[string]*edgeworksnov1.Networktest
+	Tests  map[string]*Probe
+}
+
+type Probe struct {
+	Resource *edgeworksnov1.Networktest
+	NextRun  time.Time
+}
+
+func (p Probe) CalcNextRun() time.Time {
+	now := time.Now()
+	interval, _ := time.ParseDuration(p.Resource.Spec.Interval)
+	return now.Add(interval)
 }
 
 //+kubebuilder:rbac:groups=edgeworks.no,resources=networktests,verbs=get;list;watch;create;update;patch;delete
@@ -77,11 +87,11 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		// Verify and set status
 		if test.Spec.Http != nil && test.Spec.Http.URL != "" {
 			if _, err := url.Parse(test.Spec.Http.URL); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to parse URL: %v", err)
+				return ctrl.Result{}, fmt.Errorf("Failed to parse URL: %v", err)
 			}
 		} else if test.Spec.TCP != nil && test.Spec.TCP.Address != "" {
 			if addr := net.ParseIP(test.Spec.TCP.Address); addr == nil {
-				return ctrl.Result{}, fmt.Errorf("failed to parse IP: %s", test.Spec.TCP.Address)
+				return ctrl.Result{}, fmt.Errorf("Failed to parse IP: %s", test.Spec.TCP.Address)
 			}
 
 			if test.Spec.TCP.Port <= 0 {
@@ -98,11 +108,15 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if test.Status.Accepted {
-		if ct, found := r.Tests[req.NamespacedName.String()]; !found {
-			r.Tests[req.NamespacedName.String()] = test.DeepCopy()
+		if probe, found := r.Tests[req.NamespacedName.String()]; !found {
+			probe := Probe{
+				Resource: test.DeepCopy(),
+				NextRun:  time.Now(),
+			}
+			r.Tests[req.NamespacedName.String()] = &probe
 		} else {
-			if ct.ResourceVersion != test.ResourceVersion {
-				r.Tests[req.NamespacedName.String()] = test.DeepCopy()
+			if probe.Resource.ResourceVersion != test.ResourceVersion {
+				probe.Resource = test.DeepCopy()
 			}
 		}
 	}
@@ -113,98 +127,51 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func (r *NetworktestReconciler) tester() {
 
 	for {
-		for n, t := range r.Tests {
-			ctrl.Log.Info(fmt.Sprintf("Testing %s", n))
-
-			var result testResult
-
-			if t.Spec.Http != nil {
-				result = doHttpTest(t)
-			} else {
-				ctrl.Log.Info("Unknown probe type")
-				continue
-			}
-
-			var test edgeworksnov1.Networktest
-			if err := r.Get(context.Background(), types.NamespacedName{Namespace: t.ObjectMeta.Namespace, Name: t.ObjectMeta.Name}, &test); err == nil {
-				test.Status.LastResult = result.String()
-				test.Status.Message = &result.message
-				now := metav1.NewTime(time.Now())
-				test.Status.LastRun = &now
-
-				d, _ := time.ParseDuration(test.Spec.GetInterval())
-				next := metav1.NewTime(time.Now().Add(d))
-				test.Status.NextRun = &next
-
-				r.Status().Update(context.Background(), &test)
+		now := time.Now()
+		for _, probe := range r.Tests {
+			if probe.NextRun.Before(now) {
+				go r.performTest(probe)
 			}
 		}
 
-		time.Sleep(10 * time.Second)
+		time.Sleep(30 * time.Second)
 	}
 }
 
-type testResult struct {
-	success bool
-	message string
-}
+func (r *NetworktestReconciler) performTest(p *Probe) {
+	res := p.Resource
+	ctrl.Log.Info(fmt.Sprintf("Testing %s", res.Name))
 
-const (
-	success = "Success"
-	failed  = "Failed"
-)
+	p.NextRun = p.CalcNextRun()
 
-func (t testResult) String() *string {
-	var res string
-	switch t.success {
-	case true:
-		res = success
-	default:
-		res = failed
-	}
-	return &res
-}
-
-func doHttpTest(t *edgeworksnov1.Networktest) testResult {
-	timeout, _ := time.ParseDuration(fmt.Sprintf("%ds", t.Spec.Timeout))
-	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
-	defer cancelFunc()
-
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Spec.Http.URL, nil)
-	if err != nil {
-		return testResult{
-			success: false,
-			message: err.Error(),
-		}
+	var result testers.TestResult
+	if res.Spec.Http != nil {
+		result = testers.DoHttpTest(res)
+	} else if res.Spec.TCP != nil {
+		result = testers.DoTCPTest(res)
+	} else {
+		ctrl.Log.Info("Unknown probe type")
+		return
 	}
 
-	c := http.Client{}
-	res, err := c.Do(r)
+	var test edgeworksnov1.Networktest
+	if err := r.Get(context.Background(), types.NamespacedName{Namespace: res.ObjectMeta.Namespace, Name: res.ObjectMeta.Name}, &test); err == nil {
+		test.Status.LastResult = result.String()
+		test.Status.Message = &result.Message
+		now := metav1.NewTime(time.Now())
+		test.Status.LastRun = &now
 
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return testResult{
-				success: false,
-				message: fmt.Errorf("timeout: %v", err).Error(),
-			}
-		}
+		next := metav1.NewTime(p.NextRun)
+		test.Status.NextRun = &next
 
-		return testResult{
-			success: false,
-			message: err.Error(),
-		}
-	}
-
-	return testResult{
-		success: res.StatusCode == 200,
-		message: fmt.Sprintf("http result: %s", res.Status),
+		r.Status().Update(context.Background(), &test)
 	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NetworktestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
-	r.Tests = make(map[string]*edgeworksnov1.Networktest)
+	r.Tests = make(map[string]*Probe)
 
 	go r.tester()
 

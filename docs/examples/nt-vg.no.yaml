@@ -3,7 +3,7 @@ apiVersion: edgeworks.no/v1
 metadata:
   name: vg.no
 spec:
-  interval: 5m
+  interval: 1m
   timeout: 5
   http:
     url: https://www.vg.no

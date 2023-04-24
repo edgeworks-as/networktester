@@ -39,6 +39,9 @@ type HttpProbe struct {
 type TCPProbe struct {
 	Address string `json:"address"`
 	Port    int    `json:"port"`
+
+	// +optional
+	Data string `json:"data,omitempty"`
 }
 
 func (s NetworktestSpec) GetInterval() string {

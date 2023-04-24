@@ -48,6 +48,8 @@ spec:
                 properties:
                   address:
                     type: string
+                  data:
+                    type: string
                   port:
                     type: integer
                 required:

@@ -1,9 +1,11 @@
 kind: Networktest
 apiVersion: edgeworks.no/v1
 metadata:
-  name: timeout
+  name: tcp-success
 spec:
   interval: 1m
   timeout: 5
-  http:
-    url: https://www.google.com:81
+  tcp:
+    address: 192.168.0.1
+    port: 443
+    data: "test"
