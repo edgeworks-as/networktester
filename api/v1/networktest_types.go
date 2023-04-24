@@ -70,6 +70,8 @@ type NetworktestStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:JSONPath=".status.lastResult",name=LastResult,type=string
+//+kubebuilder:printcolumn:JSONPath=".status.lastRun",name=LastRun,type=string
 
 // Networktest is the Schema for the networktests API
 type Networktest struct {

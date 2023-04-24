@@ -15,7 +15,14 @@ spec:
     singular: networktest
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.lastResult
+      name: LastResult
+      type: string
+    - jsonPath: .status.lastRun
+      name: LastRun
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         description: Networktest is the Schema for the networktests API
