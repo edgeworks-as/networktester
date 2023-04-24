@@ -1,48 +1,70 @@
 # networktester
-// TODO(user): Add simple overview of use/purpose
+
+A simple operator to enable self-service network connectivity testing in a Kubernetes cluster.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+Networktester runs as a controller in the Kubernetes cluster. 
+
+It will handle custom resources of type "Networktest" and probe them periodically according to the defined interval.
+
+Example using http probe:
+
+```yaml
+apiVersion: edgeworks.no/v1
+kind: Networktest
+metadata:
+  name: vg.no
+spec:
+  interval: 1m
+  timeout: 5
+  http:
+    url: https://www.vg.no
+```
+
+Example using TCP probe:
+```yaml
+kind: Networktest
+apiVersion: edgeworks.no/v1
+metadata:
+  name: tcp-success
+spec:
+  interval: 1m
+  timeout: 5
+  tcp:
+    address: 192.168.0.1
+    port: 443
+    data: "test"
+```
+
+The probe results are written back to the resource status field.
+
+Success:
+
+```yaml
+status:
+  accepted: true
+  lastResult: Success
+  lastRun: "2023-04-24T18:06:23Z"
+  message: 192.168.0.1:443
+  nextRun: "2023-04-24T18:07:23Z"
+```
+
+Failure:
+
+```yaml
+status:
+  accepted: true
+  lastResult: Failed
+  lastRun: "2023-04-24T18:06:28Z"
+  message: 'timeout: dial tcp 192.168.0.2:443: i/o timeout'
+  nextRun: "2023-04-24T18:07:23Z"
+```
+
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
-
-### Running on the cluster
-1. Install Instances of Custom Resources:
-
-```sh
-kubectl apply -f config/samples/
-```
-
-2. Build and push your image to the location specified by `IMG`:
-
-```sh
-make docker-build docker-push IMG=<some-registry>/networktester:tag
-```
-
-3. Deploy the controller to the cluster with the image specified by `IMG`:
-
-```sh
-make deploy IMG=<some-registry>/networktester:tag
-```
-
-### Uninstall CRDs
-To delete the CRDs from the cluster:
-
-```sh
-make uninstall
-```
-
-### Undeploy controller
-UnDeploy the controller from the cluster:
-
-```sh
-make undeploy
-```
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
 ### How it works
 This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
@@ -91,4 +113,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
