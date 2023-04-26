@@ -81,20 +81,26 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	//ctrl.Log.Info("Got object: " + req.NamespacedName.String() + " (version: " + test.ObjectMeta.ResourceVersion + ")")
 
-	if !test.Status.Accepted {
+	if !test.Status.Active {
+		accepted := true
+		var message string
+
 		// Verify and set status
 		if test.Spec.Http != nil && test.Spec.Http.URL != "" {
 			if _, err := url.Parse(test.Spec.Http.URL); err != nil {
-				return ctrl.Result{}, fmt.Errorf("Failed to parse URL: %v", err)
+				message = fmt.Errorf("Failed to parse URL: %v", err).Error()
+				accepted = false
 			}
 
 		} else if test.Spec.TCP != nil && test.Spec.TCP.Address != "" {
 			if test.Spec.TCP.Port <= 0 {
-				return ctrl.Result{}, fmt.Errorf("invalid port: %d", test.Spec.TCP.Port)
+				message = fmt.Errorf("invalid port: %d", test.Spec.TCP.Port).Error()
+				accepted = false
 			}
 		}
 
-		test.Status.Accepted = true
+		test.Status.Active = accepted
+		test.Status.Message = &message
 
 		if err := r.Status().Update(ctx, &test); err != nil {
 			ctrl.Log.Error(err, "Failed to update status of Networktest")
@@ -102,7 +108,7 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	if test.Status.Accepted {
+	if test.Status.Active {
 		if probe, found := r.Tests[req.NamespacedName.String()]; !found {
 			probe := Probe{
 				Resource: test.DeepCopy(),
@@ -151,15 +157,42 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 
 	var test edgeworksnov1.Networktest
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: res.ObjectMeta.Namespace, Name: res.ObjectMeta.Name}, &test); err == nil {
+		now := metav1.NewTime(time.Now())
 		test.Status.LastResult = result.String()
 		test.Status.Message = &result.Message
-		now := metav1.NewTime(time.Now())
 		test.Status.LastRun = &now
 
 		next := metav1.NewTime(p.NextRun)
 		test.Status.NextRun = &next
 
-		r.Status().Update(context.Background(), &test)
+		cond := metav1.Condition{
+			Type:               "Probe",
+			Reason:             "Probe",
+			Status:             getCondStatus(result),
+			ObservedGeneration: res.ObjectMeta.Generation,
+			LastTransitionTime: now,
+			Message:            *test.Status.Message,
+		}
+
+		if len(test.Status.Conditions) == 0 {
+			test.Status.Conditions = append(test.Status.Conditions, cond)
+		} else {
+			if test.Status.Conditions[len(test.Status.Conditions)-1].Status != cond.Status {
+				test.Status.Conditions = append(test.Status.Conditions, cond)
+			}
+		}
+
+		if err = r.Status().Update(context.Background(), &test); err != nil {
+			ctrl.Log.Info("Could not update status: " + err.Error())
+		}
+	}
+}
+
+func getCondStatus(result testers.TestResult) metav1.ConditionStatus {
+	if result.Success {
+		return "True"
+	} else {
+		return "False"
 	}
 }
 

@@ -6,4 +6,4 @@ spec:
   interval: 1m
   timeout: 5
   http:
-    url: https://www.vg.no
+    url: htt://www.vg.no

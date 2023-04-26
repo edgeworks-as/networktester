@@ -53,7 +53,8 @@ func (s NetworktestSpec) GetInterval() string {
 
 // NetworktestStatus defines the observed state of Networktest
 type NetworktestStatus struct {
-	Accepted bool `json:"accepted,omitempty"`
+	Active     bool               `json:"active,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// +optional
 	LastRun *metav1.Time `json:"lastRun"`
