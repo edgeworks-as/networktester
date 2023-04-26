@@ -6,6 +6,6 @@ spec:
   interval: 1m
   timeout: 5
   tcp:
-    address: 192.168.0.1
+    address: www.vg.no
     port: 443
-    data: "test"
+    data: "GET / HTTP/1.0"

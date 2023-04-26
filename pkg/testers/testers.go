@@ -13,7 +13,7 @@ import (
 func DoTCPTest(t *v1.Networktest) TestResult {
 	timeout, _ := time.ParseDuration(fmt.Sprintf("%ds", t.Spec.Timeout))
 
-	ip := net.ParseIP(t.Spec.TCP.Address)
+	ip := t.Spec.TCP.Address
 	port := t.Spec.TCP.Port
 
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), timeout)

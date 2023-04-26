@@ -23,7 +23,6 @@ import (
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"net"
 	"net/url"
 	"time"
 
@@ -88,11 +87,8 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			if _, err := url.Parse(test.Spec.Http.URL); err != nil {
 				return ctrl.Result{}, fmt.Errorf("Failed to parse URL: %v", err)
 			}
-		} else if test.Spec.TCP != nil && test.Spec.TCP.Address != "" {
-			if addr := net.ParseIP(test.Spec.TCP.Address); addr == nil {
-				return ctrl.Result{}, fmt.Errorf("Failed to parse IP: %s", test.Spec.TCP.Address)
-			}
 
+		} else if test.Spec.TCP != nil && test.Spec.TCP.Address != "" {
 			if test.Spec.TCP.Port <= 0 {
 				return ctrl.Result{}, fmt.Errorf("invalid port: %d", test.Spec.TCP.Port)
 			}
@@ -139,7 +135,7 @@ func (r *NetworktestReconciler) tester() {
 
 func (r *NetworktestReconciler) performTest(p *Probe) {
 	res := p.Resource
-	ctrl.Log.Info(fmt.Sprintf("Testing %s", res.Name))
+	ctrl.Log.V(1).Info(fmt.Sprintf("Testing %s", res.Name))
 
 	p.NextRun = p.CalcNextRun()
 
