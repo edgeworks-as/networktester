@@ -93,10 +93,26 @@ func DoHttpTest(t *v1.Networktest) TestResult {
 		}
 	}
 
+	if matchesCode(res.StatusCode, t.Spec.Http.FailOnCodes) {
+		return TestResult{
+			Success: false,
+			Message: fmt.Sprintf("http result: %s matches failOnCodes", res.Status),
+		}
+	}
+
 	return TestResult{
 		Success: true,
 		Message: fmt.Sprintf("http result: %s", res.Status),
 	}
+}
+
+func matchesCode(actualCode int, matchesCodes []int) bool {
+	for _, v := range matchesCodes {
+		if v == actualCode {
+			return true
+		}
+	}
+	return false
 }
 
 type TestResult struct {

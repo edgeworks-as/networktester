@@ -22,8 +22,15 @@ import (
 
 // NetworktestSpec defines the desired state of Networktest
 type NetworktestSpec struct {
+
+	// +kubebuilder:default:="1h"
 	Interval string `json:"interval"` // Default 1h
-	Timeout  int    `json:"timeout"`
+
+	// +kubebuilder:default:=5
+	Timeout int `json:"timeout"`
+
+	// +kubebuilder:default:=true
+	Enabled bool `json:"enabled,omitempty"`
 
 	// +optional
 	Http *HttpProbe `json:"http"`
@@ -33,7 +40,8 @@ type NetworktestSpec struct {
 }
 
 type HttpProbe struct {
-	URL string `json:"url"`
+	URL         string `json:"url"`
+	FailOnCodes []int  `json:"failOnCodes,omitempty"`
 }
 
 type TCPProbe struct {

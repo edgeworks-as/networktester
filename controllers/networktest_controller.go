@@ -81,7 +81,7 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	//ctrl.Log.Info("Got object: " + req.NamespacedName.String() + " (version: " + test.ObjectMeta.ResourceVersion + ")")
 
-	if !test.Status.Active {
+	if !test.Status.Active && test.Spec.Enabled {
 		accepted := true
 		var message string
 
@@ -101,11 +101,19 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 		test.Status.Active = accepted
 		test.Status.Message = &message
+	} else if !test.Spec.Enabled && test.Status.Active {
+		test.Status.Conditions = []metav1.Condition{}
+		test.Status.Active = false
+		test.Status.NextRun = nil
+		test.Status.LastRun = nil
+		test.Status.LastResult = nil
+		disabled := "Disabled"
+		test.Status.Message = &disabled
+	}
 
-		if err := r.Status().Update(ctx, &test); err != nil {
-			ctrl.Log.Error(err, "Failed to update status of Networktest")
-			return ctrl.Result{}, err
-		}
+	if err := r.Status().Update(ctx, &test); err != nil {
+		ctrl.Log.Error(err, "Failed to update status of Networktest")
+		return ctrl.Result{}, err
 	}
 
 	if test.Status.Active {
@@ -120,6 +128,8 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				probe.Resource = test.DeepCopy()
 			}
 		}
+	} else {
+		delete(r.Tests, req.NamespacedName.String())
 	}
 
 	return ctrl.Result{}, nil
