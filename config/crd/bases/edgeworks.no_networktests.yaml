@@ -44,28 +44,41 @@ spec:
             properties:
               enabled:
                 default: true
+                description: enabled lets you disable rules without deleting them.
+                  Default true.
                 type: boolean
               http:
+                description: http defines settings for probing using http client
                 properties:
                   failOnCodes:
+                    description: failOnCodes lists the HTTP codes that should fail
+                      the test. Empty list means a successful HTTP request means the
+                      test is good.
                     items:
                       type: integer
                     type: array
                   url:
+                    description: url must be valid http/https url
                     type: string
                 required:
                 - url
                 type: object
               interval:
                 default: 1h
+                description: interval defines how often the probing will be done.
+                  Defaults to 1h. Valid time units are "ns", "us" (or "µs"), "ms",
+                  "s", "m", "h".
                 type: string
               tcp:
+                description: tcp defines settings for probing using plain sockets
                 properties:
                   address:
+                    description: address must be valid IP address or host name
                     type: string
                   data:
                     type: string
                   port:
+                    description: port must be valid port
                     type: integer
                 required:
                 - address
@@ -73,6 +86,8 @@ spec:
                 type: object
               timeout:
                 default: 5
+                description: timeout in seconds until the probe is considered failed.
+                  Default is 5 seconds.
                 type: integer
             required:
             - interval

@@ -24,29 +24,40 @@ import (
 type NetworktestSpec struct {
 
 	// +kubebuilder:default:="1h"
+	// interval defines how often the probing will be done. Defaults to 1h. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	Interval string `json:"interval"` // Default 1h
 
 	// +kubebuilder:default:=5
+	// timeout in seconds until the probe is considered failed. Default is 5 seconds.
 	Timeout int `json:"timeout"`
 
 	// +kubebuilder:default:=true
+	// enabled lets you disable rules without deleting them. Default true.
 	Enabled bool `json:"enabled,omitempty"`
 
 	// +optional
+	// http defines settings for probing using http client
 	Http *HttpProbe `json:"http"`
 
 	// +optional
+	// tcp defines settings for probing using plain sockets
 	TCP *TCPProbe `json:"tcp"`
 }
 
 type HttpProbe struct {
-	URL         string `json:"url"`
-	FailOnCodes []int  `json:"failOnCodes,omitempty"`
+	// url must be valid http/https url
+	URL string `json:"url"`
+
+	// failOnCodes lists the HTTP codes that should fail the test. Empty list means a successful HTTP request means the test is good.
+	FailOnCodes []int `json:"failOnCodes,omitempty"`
 }
 
 type TCPProbe struct {
+	// address must be valid IP address or host name
 	Address string `json:"address"`
-	Port    int    `json:"port"`
+
+	// port must be valid port
+	Port int `json:"port"`
 
 	// +optional
 	Data string `json:"data,omitempty"`
