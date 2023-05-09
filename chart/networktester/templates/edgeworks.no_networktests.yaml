@@ -42,14 +42,22 @@ spec:
           spec:
             description: NetworktestSpec defines the desired state of Networktest
             properties:
+              enabled:
+                default: true
+                type: boolean
               http:
                 properties:
+                  failOnCodes:
+                    items:
+                      type: integer
+                    type: array
                   url:
                     type: string
                 required:
                 - url
                 type: object
               interval:
+                default: 1h
                 type: string
               tcp:
                 properties:
@@ -64,6 +72,7 @@ spec:
                 - port
                 type: object
               timeout:
+                default: 5
                 type: integer
             required:
             - interval
