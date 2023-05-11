@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net/url"
+	"reflect"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +40,8 @@ import (
 type NetworktestReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	Tests  map[string]*Probe
+	//Tests  map[string]*Probe
+	Tests sync.Map
 }
 
 type Probe struct {
@@ -71,6 +74,8 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	var test edgeworksnov1.Networktest
 	if err := r.Get(ctx, req.NamespacedName, &test); err != nil {
 		if k8errors.IsNotFound(err) {
+			ctrl.Log.V(1).Info(fmt.Sprintf("Removed %s", req.NamespacedName.String()))
+			r.Tests.Delete(req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 
@@ -78,8 +83,6 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		ctrl.Log.Error(err, "Failed to get Networktest")
 		return ctrl.Result{}, err
 	}
-
-	//ctrl.Log.Info("Got object: " + req.NamespacedName.String() + " (version: " + test.ObjectMeta.ResourceVersion + ")")
 
 	if !test.Status.Active && test.Spec.Enabled {
 		accepted := true
@@ -117,19 +120,26 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if test.Status.Active {
-		if probe, found := r.Tests[req.NamespacedName.String()]; !found {
+		//if probe, found := r.Tests[req.NamespacedName.String()]; !found {
+		if probe, found := r.Tests.Load(req.NamespacedName.String()); !found {
 			probe := Probe{
 				Resource: test.DeepCopy(),
 				NextRun:  time.Now(),
 			}
-			r.Tests[req.NamespacedName.String()] = &probe
+			//r.Tests[req.NamespacedName.String()] = &probe
+			r.Tests.Store(req.NamespacedName.String(), &probe)
+			ctrl.Log.V(1).Info(fmt.Sprintf("Added %s", req.NamespacedName.String()))
 		} else {
-			if probe.Resource.ResourceVersion != test.ResourceVersion {
-				probe.Resource = test.DeepCopy()
+			p := probe.(*Probe)
+			if p.Resource.ResourceVersion != test.ResourceVersion && !reflect.DeepEqual(p.Resource.Spec, test.Spec) {
+				p.Resource = test.DeepCopy()
+				r.Tests.Swap(req.NamespacedName.String(), p)
+				ctrl.Log.V(1).Info(fmt.Sprintf("Updated %s", req.NamespacedName.String()))
 			}
 		}
 	} else {
-		delete(r.Tests, req.NamespacedName.String())
+		r.Tests.Delete(req.NamespacedName.String())
+		ctrl.Log.V(1).Info(fmt.Sprintf("Deactivated %s", req.NamespacedName.String()))
 	}
 
 	return ctrl.Result{}, nil
@@ -139,11 +149,13 @@ func (r *NetworktestReconciler) tester() {
 
 	for {
 		now := time.Now()
-		for _, probe := range r.Tests {
+		r.Tests.Range(func(n, p any) bool {
+			probe := p.(*Probe)
 			if probe.NextRun.Before(now) {
 				go r.performTest(probe)
 			}
-		}
+			return true
+		})
 
 		time.Sleep(30 * time.Second)
 	}
@@ -195,6 +207,8 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 		if err = r.Status().Update(context.Background(), &test); err != nil {
 			ctrl.Log.Info("Could not update status: " + err.Error())
 		}
+	} else {
+		ctrl.Log.Error(err, "Update test status: "+err.Error())
 	}
 }
 
@@ -209,7 +223,7 @@ func getCondStatus(result testers.TestResult) metav1.ConditionStatus {
 // SetupWithManager sets up the controller with the Manager.
 func (r *NetworktestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
-	r.Tests = make(map[string]*Probe)
+	//r.Tests = make(map[string]*Probe)
 
 	go r.tester()
 
