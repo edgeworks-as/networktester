@@ -20,11 +20,13 @@ import (
 	"context"
 	"edgeworks.no/networktester/pkg/testers"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net/url"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sync"
 	"time"
 
@@ -35,6 +37,16 @@ import (
 
 	edgeworksnov1 "edgeworks.no/networktester/api/v1"
 )
+
+var testResult = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "networktester_probe",
+		Help: "Result of Networktester probe run",
+	}, []string{"namespace", "name", "address", "message", "result"})
+
+func init() {
+	metrics.Registry.Register(testResult)
+}
 
 // NetworktestReconciler reconciles a Networktest object
 type NetworktestReconciler struct {
@@ -186,6 +198,9 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 
 		next := metav1.NewTime(p.NextRun)
 		test.Status.NextRun = &next
+
+		// "namespace", "networktest", "address", "message", "result"})
+		testResult.WithLabelValues(test.Namespace, test.Name, test.Spec.GetAddress(), result.Message, *result.String()).Set(1)
 
 		cond := metav1.Condition{
 			Type:               "Probe",
