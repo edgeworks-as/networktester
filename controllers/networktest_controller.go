@@ -189,6 +189,13 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 		return
 	}
 
+	// "namespace", "networktest", "address", "message", "result"})
+	val := 0
+	if result.Success {
+		val = 1
+	}
+	testResult.WithLabelValues(p.Resource.Namespace, p.Resource.Name, p.Resource.Spec.GetAddress(), result.Message, *result.String()).Set(float64(val))
+
 	var test edgeworksnov1.Networktest
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: res.ObjectMeta.Namespace, Name: res.ObjectMeta.Name}, &test); err == nil {
 		now := metav1.NewTime(time.Now())
@@ -198,9 +205,6 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 
 		next := metav1.NewTime(p.NextRun)
 		test.Status.NextRun = &next
-
-		// "namespace", "networktest", "address", "message", "result"})
-		testResult.WithLabelValues(test.Namespace, test.Name, test.Spec.GetAddress(), result.Message, *result.String()).Set(1)
 
 		cond := metav1.Condition{
 			Type:               "Probe",
