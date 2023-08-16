@@ -20,11 +20,13 @@ import (
 	"context"
 	"edgeworks.no/networktester/pkg/testers"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net/url"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sync"
 	"time"
 
@@ -35,6 +37,16 @@ import (
 
 	edgeworksnov1 "edgeworks.no/networktester/api/v1"
 )
+
+var testResult = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "networktester_probe",
+		Help: "Result of Networktester probe run",
+	}, []string{"namespace", "name", "address", "message", "result"})
+
+func init() {
+	metrics.Registry.Register(testResult)
+}
 
 // NetworktestReconciler reconciles a Networktest object
 type NetworktestReconciler struct {
@@ -176,6 +188,13 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 		ctrl.Log.Info("Unknown probe type")
 		return
 	}
+
+	// "namespace", "networktest", "address", "message", "result"})
+	val := 0
+	if result.Success {
+		val = 1
+	}
+	testResult.WithLabelValues(p.Resource.Namespace, p.Resource.Name, p.Resource.Spec.GetAddress(), result.Message, *result.String()).Set(float64(val))
 
 	var test edgeworksnov1.Networktest
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: res.ObjectMeta.Namespace, Name: res.ObjectMeta.Name}, &test); err == nil {
