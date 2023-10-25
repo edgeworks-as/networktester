@@ -4,14 +4,14 @@ kind: Service
 metadata:
   name: {{ include "networktester.fullname" . }}
   labels:
-    {{- include "networktester.labels" . | nindent 4 }}
+    {{- include "networktester.selectorLabels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: ClusterIP
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - port: 8080
+      targetPort: metrics
       protocol: TCP
-      name: http
+      name: metrics
   selector:
     {{- include "networktester.selectorLabels" . | nindent 4 }}
 {{- end }}

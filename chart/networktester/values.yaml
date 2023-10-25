@@ -19,15 +19,19 @@ serviceAccount:
   annotations: {}
   name: "networktester"
 
+serviceMonitor:
+  annotations:
+    scrape-by: prometheus
+  labels:
+    serviceMonitorSelector: prometheus
+
 podAnnotations: {}
 podSecurityContext: {}
 securityContext: {}
 
 
 service:
-  create: false
-  type: ClusterIP
-  port: 80
+  create: true
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
