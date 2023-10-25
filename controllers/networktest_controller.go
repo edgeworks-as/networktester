@@ -42,7 +42,7 @@ var testResult = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "networktester_probe",
 		Help: "Result of Networktester probe run",
-	}, []string{"namespace", "name", "address", "message", "result"})
+	}, []string{"namespace", "name", "address"})
 
 func init() {
 	metrics.Registry.Register(testResult)
@@ -194,7 +194,7 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 	if result.Success {
 		val = 1
 	}
-	testResult.WithLabelValues(p.Resource.Namespace, p.Resource.Name, p.Resource.Spec.GetAddress(), result.Message, *result.String()).Set(float64(val))
+	testResult.WithLabelValues(p.Resource.Namespace, p.Resource.Name, p.Resource.Spec.GetAddress()).Set(float64(val))
 
 	var test edgeworksnov1.Networktest
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: res.ObjectMeta.Namespace, Name: res.ObjectMeta.Name}, &test); err == nil {
