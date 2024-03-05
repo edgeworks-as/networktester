@@ -51,6 +51,10 @@ type HttpProbe struct {
 
 	// failOnCodes lists the HTTP codes that should fail the test. Empty list means a successful HTTP request means the test is good.
 	FailOnCodes []int `json:"failOnCodes,omitempty"`
+
+	// tlsSkipVerify allows optional https without verifying server certificate (default: false)
+	// +optional
+	TlsSkipVerify bool `json:"tlsSkipVerify,omitempty"`
 }
 
 type TCPProbe struct {
