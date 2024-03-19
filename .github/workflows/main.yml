@@ -53,7 +53,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Install Helm
-        uses: azure/setup-helm
+        uses: azure/setup-helm@v4
         with:
           version: '<version>' # default is latest (stable)
         id: install
