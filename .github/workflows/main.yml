@@ -50,4 +50,18 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-    
+
+      - name: Install Helm
+        uses: azure/setup-helm
+        with:
+          version: '<version>' # default is latest (stable)
+        id: install
+
+      - name: Helm Lint
+        run: |
+          helm lint chart/networktester
+
+      - name: Helm package
+        run: |
+          v = $(echo "${{ steps.meta.outputs.tags }}" | sed 's/^v//')
+          helm package --app-version ${{ steps.meta.outputs.tags }} --version $v chart/networktester

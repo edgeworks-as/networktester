@@ -17,4 +17,10 @@ k8s_yaml(helm(
 ))
 
 # build and push the controller image to the local registry
-docker_build("localhost:5005/networktester", ".")
+local_resource(
+  'go-compile',
+  'CGO_ENABLED=0 GOOS=linux go build -o manager main.go',
+  deps=['./main.go', './pkg/', './api/'],
+  resource_deps = ['deploy'])
+
+docker_build("localhost:5005/networktester", ".", dockerfile='hack/Dockerfile.tilt')
