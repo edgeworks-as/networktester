@@ -69,11 +69,9 @@ jobs:
           helm lint chart/networktester
 
       - name: Helm package and push
-        env:
-          CR_PATH: ${{ secrets.GITHUB_TOKEN }}
         run: |
           helm package --app-version ${{ steps.version.outputs.version }} --version ${{ steps.version.outputs.version }} chart/networktester
-          echo $CR_PAT | helm registry login -u USERNAME --password-stdin ghcr.io
+          docker login -u USERNAME -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
           helm push networktester/networktester-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/edgeworks-as/charts
 
       - name: Tag Git with created version
