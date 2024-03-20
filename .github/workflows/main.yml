@@ -68,22 +68,26 @@ jobs:
         run: |
           helm lint chart/networktester
 
-      - name: Helm package
+      - name: Helm package and push
+        env:
+          CR_PATH: ${{ secrets.GITHUB_TOKEN }}
         run: |
           helm package --app-version ${{ steps.version.outputs.version }} --version ${{ steps.version.outputs.version }} chart/networktester
+          echo $CR_PAT | helm registry login -u USERNAME --password-stdin ghcr.io
+          helm push networktester/networktester-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/edgeworks-as/charts
 
-#      - name: Tag Git with created version
-#        uses: actions/github-script@v7
-#        if: steps.version.outputs.changed
-#        env:
-#          TAG: ${{ steps.version.outputs.version }}
-#          SHA: ${{ github.sha }}
-#        with:
-#          retries: 3
-#          script: |
-#            github.rest.git.createRef({
-#              owner: context.repo.owner,
-#              repo: context.repo.repo,
-#              ref: `refs/tags/helm-chart-nova-namespace/${process.env['TAG']}`,
-#              sha: `${process.env['SHA']}`,
-#            });
+      - name: Tag Git with created version
+        uses: actions/github-script@v7
+        if: steps.version.outputs.changed
+        env:
+          TAG: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.sha }}
+        with:
+          retries: 3
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/helm-chart-nova-namespace/${process.env['TAG']}`,
+              sha: `${process.env['SHA']}`,
+            });
