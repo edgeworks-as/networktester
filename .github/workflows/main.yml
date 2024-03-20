@@ -11,9 +11,7 @@ name: Create and publish a Docker image
 
 on:
   push:
-    branches: ['release']
-    tags:
-      - 'v*'
+    branches: ['main']
   workflow_dispatch:
 
 env:
@@ -38,6 +36,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Calculate new tag for versioning
+        id: version
+        uses: paulhatch/semantic-version@v5.4.0
+        with:
+          tag_prefix: ""              # The prefix to use to identify tags
+          search_commit_body: true    # If true, the body of commits will also be searched for major/minor patterns to determine the version type.
+          change_path: go* *.go controllers/* api/* chart/* pkg/* test/*
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
@@ -45,11 +51,12 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
+        if: steps.version.outputs.changed
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.version.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Install Helm
@@ -61,5 +68,20 @@ jobs:
 
       - name: Helm package
         run: |
-          v=$(echo "${{ steps.meta.outputs.tags }}" | sed 's/^v//')
-          helm package --app-version ${{ steps.meta.outputs.tags }} --version $v chart/networktester
+          helm package --app-version ${{ steps.version.outputs.version }} --version ${{ steps.version.outputs.version }} chart/networktester
+
+#      - name: Tag Git with created version
+#        uses: actions/github-script@v7
+#        if: steps.version.outputs.changed
+#        env:
+#          TAG: ${{ steps.version.outputs.version }}
+#          SHA: ${{ github.sha }}
+#        with:
+#          retries: 3
+#          script: |
+#            github.rest.git.createRef({
+#              owner: context.repo.owner,
+#              repo: context.repo.repo,
+#              ref: `refs/tags/helm-chart-nova-namespace/${process.env['TAG']}`,
+#              sha: `${process.env['SHA']}`,
+#            });
