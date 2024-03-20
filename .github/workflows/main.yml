@@ -72,7 +72,7 @@ jobs:
         run: |
           helm package --app-version ${{ steps.version.outputs.version }} --version ${{ steps.version.outputs.version }} chart/networktester
           docker login -u USERNAME -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
-          helm push networktester-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/edgeworks-as/charts
+          helm push networktester-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/edgeworks-as/networktester/charts
 
       - name: Tag Git with created version
         uses: actions/github-script@v7
