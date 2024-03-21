@@ -105,7 +105,7 @@ jobs:
         with:
           tag_prefix: ""              # The prefix to use to identify tags
           search_commit_body: true    # If true, the body of commits will also be searched for major/minor patterns to determine the version type.
-          change_path: go* *.go controllers/* api/* chart/* pkg/* test/*
+          change_path: go* *.go controllers/* api/* chart/* pkg/* test/* Dockerfile
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
