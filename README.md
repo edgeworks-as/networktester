@@ -1,14 +1,21 @@
-# networktester
+[![Release version](https://github.com/edgeworks-as/networktester/actions/workflows/main.yml/badge.svg)](https://github.com/edgeworks-as/networktester/actions/workflows/main.yml)
+
+# Networktester
 
 A simple operator to enable self-service network connectivity testing in a Kubernetes cluster.
 
-## Description
+## Usage
 
 Networktester runs as a controller in the Kubernetes cluster. 
 
-It will handle custom resources of type "Networktest" and probe them periodically according to the defined interval.
+It will handle custom resources of type "Networktest" and probe them periodically according to the defined interval. Unless
+deployed in single namespace mode, the controller will handle Networktests across all namespaces.
 
-### Defining the probe
+The tests will be performed from the controller itself, and which means it will reflect network connectivity from the controller
+namespace, and not necessarily what is the reality in the namespace of a given Networktest CR. This can be fixed by running the
+controller in a sngle-namespace mode, and deploy it to specific namespaces.
+
+### Defining tests
 
 Using **HTTP** probe:
 
@@ -67,22 +74,21 @@ status:
   nextRun: "2023-04-24T18:07:23Z"
 ```
 
-# Installation
+## Installation
 
-## Container images
+### Container images
 
-Container images are pushed to <https://github.com/edgeworks-as/networktester/pkgs/container/networktester>
+Container images are pushed to GitHub Container registry.
 
-Docker pull:
+The images can be found [here](https://github.com/edgeworks-as/networktester/pkgs/container/networktester).
 
-```shell
-docker pull ghcr.io/edgeworks-as/networktester:v0.0.1
-```
+### Helm
 
-## Helm
+The easiest installation method is through the use of Helm.
 
-Updated charts are pushed to <https://github.com/edgeworks-as/networktester/pkgs/container/networktester%2Fcharts%2Fnetworktester> for each new version. Charts are versioned in line
-with the image.
+Updated charts are pushed to [GitHub Container Registry](https://github.com/edgeworks-as/networktester/pkgs/container/networktester%2Fcharts%2Fnetworktester). 
+
+Charts are versioned in line with the corresponding image version.
 
 Test templating of chart by doing
 
@@ -90,32 +96,31 @@ Test templating of chart by doing
 helm template oci://ghcr.io/edgeworks-as/networktester/charts/networktester
 ```
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+#### Running Networktester in single-namespace mode
 
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+Override the restrictNamespace in values.yaml to restrict watching of Networktests to a single namespace. While not necessary, 
+it would be a good idea to run the controller in the same namespace.
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
-which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
-
-### Test It Out
-1. Install the CRDs into the cluster:
-
-```sh
-make install
+```shell
+helm template oci://ghcr.io/edgeworks-as/networktester/charts/networktester --set restrictNamespace="test"
 ```
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
+## Development
 
-```sh
-make run
+### Local development
+
+A local development environment is easily set up using Kind and Tilt.
+
+```shell
+# Create Kind cluster
+./hack/kind.sh
+
+# Deploy using Tilt
+tilt up
 ```
-
-**NOTE:** You can also run this in one step by running: `make install run`
 
 ### Modifying the API definitions
+
 If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
 
 ```sh
