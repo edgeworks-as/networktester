@@ -7,20 +7,82 @@
 # To get a newer version, you will need to update the SHA.
 # You can also reference a tag or branch, but the action may change without warning.
 
-name: Create and publish a Docker image
+name: Release version
 
 on:
+  pull_request:
+    branches: [ 'main' ]
   push:
-    branches: ['release']
-    tags:
-      - 'v*'
+    branches: ['main']
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push-image:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Download Go dependencies
+        shell: bash
+        run: |
+          go mod download
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3.5
+        with:
+          version: '3.14.0'
+
+      - name: Helm Lint
+        run: |
+          helm lint chart/networktester
+
+      - name: Install tools
+        shell: bash
+        run: |
+          
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          kubectl version --client=true
+          
+          curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash
+          tilt version
+          
+          curl -LO https://github.com/kyverno/chainsaw/releases/download/v0.1.8/chainsaw_linux_amd64.tar.gz
+          tar -xzf chainsaw_linux_amd64.tar.gz
+          sudo mv chainsaw /usr/local/bin/chainsaw
+          chainsaw version
+
+      - name: Start kind cluster
+        shell: bash
+        run: |
+          [ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.21.0/kind-linux-amd64
+          chmod +x ./kind
+          ./hack/kind.sh
+
+      - name: Tilt ci
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tilt ci
+
+      - name: Run e2e tests
+        shell: bash
+        run: |
+          chainsaw test
+
+  release:
+    needs: test
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,6 +99,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Calculate new tag for versioning
+        id: version
+        uses: paulhatch/semantic-version@v5.4.0
+        with:
+          tag_prefix: ""              # The prefix to use to identify tags
+          search_commit_body: true    # If true, the body of commits will also be searched for major/minor patterns to determine the version type.
+          change_path: go* *.go controllers/* api/* chart/* pkg/* test/*
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
@@ -44,10 +114,40 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        if: steps.version.outputs.changed
+        uses: docker/build-push-action@v5.3.0
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
-    
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Helm package
+        if: steps.version.outputs.changed
+        run: |
+          helm package --app-version ${{ steps.version.outputs.version }} --version ${{ steps.version.outputs.version }} chart/networktester
+          docker login -u USERNAME -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+
+      - name: Helm push
+        if: steps.version.outputs.changed
+        run: |    
+          helm push networktester-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/edgeworks-as/networktester/charts
+
+      - name: Tag Git with created version
+        uses: actions/github-script@v7
+        if: steps.version.outputs.changed
+        env:
+          TAG: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.sha }}
+        with:
+          retries: 3
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/`${process.env['TAG']}`,
+              sha: `${process.env['SHA']}`,
+            });

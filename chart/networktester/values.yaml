@@ -2,9 +2,9 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+restrictNamespace: ""
 
 installCrds: true
-
 replicaCount: 1
 image:
   repository: ghcr.io/edgeworks-as/networktester
@@ -20,6 +20,7 @@ serviceAccount:
   name: "networktester"
 
 serviceMonitor:
+  create: true
   annotations:
     scrape-by: prometheus
   labels:

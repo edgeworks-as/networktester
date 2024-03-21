@@ -52,8 +52,9 @@ func init() {
 type NetworktestReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	//Tests  map[string]*Probe
-	Tests sync.Map
+
+	Tests       sync.Map
+	TriggerChan chan struct{}
 }
 
 type Probe struct {
@@ -132,15 +133,16 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if test.Status.Active {
-		//if probe, found := r.Tests[req.NamespacedName.String()]; !found {
+		// Either add or replace probe
 		if probe, found := r.Tests.Load(req.NamespacedName.String()); !found {
 			probe := Probe{
 				Resource: test.DeepCopy(),
 				NextRun:  time.Now(),
 			}
-			//r.Tests[req.NamespacedName.String()] = &probe
+
 			r.Tests.Store(req.NamespacedName.String(), &probe)
 			ctrl.Log.V(1).Info(fmt.Sprintf("Added %s", req.NamespacedName.String()))
+			r.TriggerChan <- struct{}{}
 		} else {
 			p := probe.(*Probe)
 			if p.Resource.ResourceVersion != test.ResourceVersion && !reflect.DeepEqual(p.Resource.Spec, test.Spec) {
@@ -150,6 +152,7 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 		}
 	} else {
+		// Remove probe
 		r.Tests.Delete(req.NamespacedName.String())
 		ctrl.Log.V(1).Info(fmt.Sprintf("Deactivated %s", req.NamespacedName.String()))
 	}
@@ -158,7 +161,6 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *NetworktestReconciler) tester() {
-
 	for {
 		now := time.Now()
 		r.Tests.Range(func(n, p any) bool {
@@ -169,7 +171,10 @@ func (r *NetworktestReconciler) tester() {
 			return true
 		})
 
-		time.Sleep(30 * time.Second)
+		select {
+		case <-r.TriggerChan:
+		case <-time.After(30 * time.Second):
+		}
 	}
 }
 
@@ -189,7 +194,6 @@ func (r *NetworktestReconciler) performTest(p *Probe) {
 		return
 	}
 
-	// "namespace", "networktest", "address", "message", "result"})
 	val := 0
 	if result.Success {
 		val = 1
@@ -241,11 +245,7 @@ func getCondStatus(result testers.TestResult) metav1.ConditionStatus {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NetworktestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
-	//r.Tests = make(map[string]*Probe)
-
 	go r.tester()
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&edgeworksnov1.Networktest{}).
 		Complete(r)
