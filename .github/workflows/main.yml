@@ -109,6 +109,11 @@ jobs:
           search_commit_body: true    # If true, the body of commits will also be searched for major/minor patterns to determine the version type.
           change_path: go* *.go controllers/* api/* chart/* pkg/* test/* Dockerfile
 
+      - name: Version info
+        run: |
+          echo "Changed: " ${{steps.version.outputs.changed}}
+          echo "Version: " ${{ steps.version.outputs.version }}
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
