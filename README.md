@@ -67,6 +67,28 @@ status:
   nextRun: "2023-04-24T18:07:23Z"
 ```
 
+# Installation
+
+## Container images
+
+Container images are pushed to <https://github.com/edgeworks-as/networktester/pkgs/container/networktester>
+
+Docker pull:
+
+```shell
+docker pull ghcr.io/edgeworks-as/networktester:v0.0.1
+```
+
+## Helm
+
+Updated charts are pushed to <https://github.com/edgeworks-as/networktester/pkgs/container/networktester%2Fcharts%2Fnetworktester> for each new version. Charts are versioned in line
+with the image.
+
+Test templating of chart by doing
+
+```shell
+helm template oci://ghcr.io/edgeworks-as/networktester/charts/networktester
+```
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
