@@ -78,8 +78,7 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: |
-          chainsaw test%
-
+          chainsaw test
 
   release:
     needs: test
