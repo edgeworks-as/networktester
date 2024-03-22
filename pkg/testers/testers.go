@@ -2,6 +2,7 @@ package testers
 
 import (
 	"context"
+	"crypto/tls"
 	"edgeworks.no/networktester/api/v1"
 	"errors"
 	"fmt"
@@ -78,7 +79,9 @@ func DoHttpTest(t *v1.Networktest) TestResult {
 
 	tr := &http.Transport{}
 	if t.Spec.Http.TlsSkipVerify {
-		tr.TLSClientConfig.InsecureSkipVerify = true
+		tr.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
 	}
 	c := http.Client{Transport: tr}
 
