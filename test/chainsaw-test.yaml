@@ -1,0 +1,83 @@
+# chainsaw-test.yaml
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: full-test-example
+spec:
+  namespace: nondefault
+  steps:
+    - name: add https test in watched namespace and verify success
+      try:
+        - apply:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test
+                namespace: default
+              spec:
+                interval: 3s
+                timeout: 5
+                http:
+                  url: https://github.com
+        - assert:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test
+                namespace: default
+              status:
+                active: true
+                lastResult: Success
+
+    - name: add tcp test in watched namespace and verify success
+      try:
+        - apply:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test2
+                namespace: default
+              spec:
+                interval: 3s
+                timeout: 5
+                tcp:
+                  address: github.com
+                  port: 443
+                  data: "GET / HTTP/1.0"
+        - assert:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test2
+                namespace: default
+              status:
+                active: true
+                lastResult: Success
+
+    - name: add https test in unwatched namespace and verify it is not being picked up
+      try:
+        - apply:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test
+              spec:
+                interval: 3s
+                timeout: 5
+                http:
+                  url: https://github.com
+        - sleep:
+            duration: 5s
+        - assert:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test
+                namespace: default
+              status: {}

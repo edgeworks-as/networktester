@@ -72,6 +72,7 @@ func main() {
 	cacheOpts := cache.Options{}
 	if restrictNamespace != "" {
 		cacheOpts.DefaultNamespaces = map[string]cache.Config{restrictNamespace: cache.Config{}}
+		setupLog.Info("restrict watching to single namespace", "namespace", restrictNamespace)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -91,8 +92,9 @@ func main() {
 	}
 
 	if err = (&controllers.NetworktestReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		TriggerChan: make(chan struct{}),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Networktest")
 		os.Exit(1)
