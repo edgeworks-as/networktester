@@ -2,6 +2,7 @@ package testers
 
 import (
 	"context"
+	"crypto/tls"
 	"edgeworks.no/networktester/api/v1"
 	"errors"
 	"fmt"
@@ -53,7 +54,7 @@ func DoTCPTest(t *v1.Networktest) TestResult {
 	if num != dataLen {
 		return TestResult{
 			Success: false,
-			Message: fmt.Errorf("Failed to write data: %d != %d", num, dataLen).Error(),
+			Message: fmt.Errorf("failed to write data: %d != %d", num, dataLen).Error(),
 		}
 	}
 
@@ -76,7 +77,14 @@ func DoHttpTest(t *v1.Networktest) TestResult {
 		}
 	}
 
-	c := http.Client{}
+	tr := &http.Transport{}
+	if t.Spec.Http.TlsSkipVerify {
+		tr.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+	c := http.Client{Transport: tr}
+
 	res, err := c.Do(r)
 
 	if err != nil {

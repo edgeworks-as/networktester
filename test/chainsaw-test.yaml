@@ -13,7 +13,7 @@ spec:
               kind: Networktest
               apiVersion: edgeworks.no/v1
               metadata:
-                name: test
+                name: test-https
                 namespace: default
               spec:
                 interval: 3s
@@ -25,7 +25,33 @@ spec:
               kind: Networktest
               apiVersion: edgeworks.no/v1
               metadata:
-                name: test
+                name: test-https
+                namespace: default
+              status:
+                active: true
+                lastResult: Success
+
+    - name: add https test with skipTlsVerify in watched namespace and verify success
+      try:
+        - apply:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test-https-skip-tls
+                namespace: default
+              spec:
+                interval: 3s
+                timeout: 5
+                http:
+                  url: https://github.com
+                  tlsSkipVerify: true
+        - assert:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test-https-skip-tls
                 namespace: default
               status:
                 active: true
@@ -38,7 +64,7 @@ spec:
               kind: Networktest
               apiVersion: edgeworks.no/v1
               metadata:
-                name: test2
+                name: test-tcp
                 namespace: default
               spec:
                 interval: 3s
@@ -52,7 +78,7 @@ spec:
               kind: Networktest
               apiVersion: edgeworks.no/v1
               metadata:
-                name: test2
+                name: test-tcp
                 namespace: default
               status:
                 active: true
@@ -65,7 +91,7 @@ spec:
               kind: Networktest
               apiVersion: edgeworks.no/v1
               metadata:
-                name: test
+                name: test-not-watched
               spec:
                 interval: 3s
                 timeout: 5
@@ -78,6 +104,5 @@ spec:
               kind: Networktest
               apiVersion: edgeworks.no/v1
               metadata:
-                name: test
-                namespace: default
+                name: test-not-watched
               status: {}

@@ -57,6 +57,10 @@ spec:
                     items:
                       type: integer
                     type: array
+                  tlsSkipVerify:
+                    description: 'tlsSkipVerify allows optional https without verifying
+                      server certificate (default: false)'
+                    type: boolean
                   url:
                     description: url must be valid http/https url
                     type: string
