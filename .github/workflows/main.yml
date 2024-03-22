@@ -82,7 +82,7 @@ jobs:
 
   release:
     needs: test
-    if: ${{github.ref}} == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -113,6 +113,7 @@ jobs:
         run: |
           echo "Changed: " ${{steps.version.outputs.changed}}
           echo "Version: " ${{ steps.version.outputs.version }}
+          echo "Branch:" ${{ github.ref }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
