@@ -111,9 +111,9 @@ jobs:
 
       - name: Version info
         run: |
-          echo "Changed: " ${{steps.version.outputs.changed}}
-          echo "Version: " ${{ steps.version.outputs.version }}
-          echo "Branch:" ${{ github.ref }}
+          echo "Changed: '${{steps.version.outputs.changed }}'"
+          echo "Version: '${{ steps.version.outputs.version }}'"
+          echo "Branch:  '${{ github.ref }}'"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -121,7 +121,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - if: steps.version.outputs.changed
+      - if: steps.version.outputs.changed == 'true'
         name: Build and push Docker image
         uses: docker/build-push-action@v5.3.0
         with:
@@ -131,23 +131,23 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Install Helm
-        if: steps.version.outputs.changed
+        if: steps.version.outputs.changed == 'true'
         uses: azure/setup-helm@v4
 
       - name: Helm package
-        if: steps.version.outputs.changed
+        if: steps.version.outputs.changed == 'true'
         run: |
           helm package --app-version ${{ steps.version.outputs.version }} --version ${{ steps.version.outputs.version }} chart/networktester
           docker login -u USERNAME -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
 
       - name: Helm push
-        if: steps.version.outputs.changed
+        if: steps.version.outputs.changed == 'true'
         run: |    
           helm push networktester-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/edgeworks-as/networktester/charts
 
       - name: Tag Git with created version
         uses: actions/github-script@v7
-        if: steps.version.outputs.changed
+        if: steps.version.outputs.changed == 'true'
         env:
           TAG: ${{ steps.version.outputs.version }}
           SHA: ${{ github.sha }}
