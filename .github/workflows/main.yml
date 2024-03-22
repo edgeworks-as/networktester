@@ -120,8 +120,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Build and push Docker image
-        if: ${{ steps.version.outputs.changed == true }}
+      - if: steps.version.outputs.changed
+        name: Build and push Docker image
         uses: docker/build-push-action@v5.3.0
         with:
           context: .
