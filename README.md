@@ -119,6 +119,15 @@ A local development environment is easily set up using Kind and Tilt.
 tilt up
 ```
 
+### Testing
+
+End-to-end tests are written in [Chainsaw](https://kyverno.github.io/chainsaw/latest/intro/).
+
+```shell
+# Run test suite - after setting up local development environment described above
+chainsaw test
+```
+
 ### Modifying the API definitions
 
 If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
