@@ -20,7 +20,6 @@ k8s_yaml(helm(
 local_resource(
   'go-compile',
   'CGO_ENABLED=0 GOOS=linux go build -o manager main.go',
-  deps=['./main.go', './pkg/', './api/'],
-  resource_deps = ['deploy'])
+  deps=['./main.go', './pkg/', './controllers/', './api/'])
 
-docker_build("localhost:5005/networktester", ".", dockerfile='hack/Dockerfile.tilt')
+docker_build("localhost:5005/networktester", ".", dockerfile='hack/Dockerfile.tilt', extra_tag='latest', only = 'manager')
