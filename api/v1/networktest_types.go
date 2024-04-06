@@ -43,6 +43,10 @@ type NetworktestSpec struct {
 	// +optional
 	// tcp defines settings for probing using plain sockets
 	TCP *TCPProbe `json:"tcp"`
+
+	// +optional
+	// limit number of probe result transitions to keep in the status. Default 0 - no limit.
+	HistoryLimit int `json:"historyLimit"`
 }
 
 type HttpProbe struct {

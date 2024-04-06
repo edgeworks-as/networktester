@@ -47,6 +47,10 @@ spec:
                 description: enabled lets you disable rules without deleting them.
                   Default true.
                 type: boolean
+              historyLimit:
+                description: limit number of probe result transitions to keep in the
+                  status. Default 0 - no limit.
+                type: integer
               http:
                 description: http defines settings for probing using http client
                 properties:
