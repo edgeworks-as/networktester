@@ -31,6 +31,40 @@ spec:
                 active: true
                 lastResult: Success
 
+    - name: verify that capping history limit works by capping at 1
+      try:
+        - sleep:
+            duration: 2s
+        - apply:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test-https
+                namespace: default
+              spec:
+                interval: 3s
+                timeout: 5
+                historyLimit: 1
+                http:
+                  url: https://github.com
+        - sleep:
+            duration: 2s
+        - assert:
+            resource:
+              kind: Networktest
+              apiVersion: edgeworks.no/v1
+              metadata:
+                name: test-https
+                namespace: default
+                generation: 2
+              status:
+                active: true
+                lastResult: Success
+                conditions:
+                  - observedGeneration: 2
+                (length(conditions)): 1
+
     - name: add https test with skipTlsVerify in watched namespace and verify success
       try:
         - apply:

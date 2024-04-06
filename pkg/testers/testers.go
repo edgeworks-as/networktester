@@ -11,7 +11,19 @@ import (
 	"time"
 )
 
-func DoTCPTest(t *v1.Networktest) TestResult {
+func PerformTest(t *v1.Networktest) (TestResult, error) {
+
+	switch {
+	case t.Spec.Http != nil:
+		return doHttpTest(t), nil
+	case t.Spec.TCP != nil:
+		return doTCPTest(t), nil
+	default:
+		return TestResult{}, fmt.Errorf("unknown probe type")
+	}
+}
+
+func doTCPTest(t *v1.Networktest) TestResult {
 	timeout, _ := time.ParseDuration(fmt.Sprintf("%ds", t.Spec.Timeout))
 
 	ip := t.Spec.TCP.Address
@@ -64,7 +76,7 @@ func DoTCPTest(t *v1.Networktest) TestResult {
 	}
 }
 
-func DoHttpTest(t *v1.Networktest) TestResult {
+func doHttpTest(t *v1.Networktest) TestResult {
 	timeout, _ := time.ParseDuration(fmt.Sprintf("%ds", t.Spec.Timeout))
 	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 	defer cancelFunc()

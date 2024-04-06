@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net/url"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sync"
 	"time"
@@ -58,13 +57,14 @@ type NetworktestReconciler struct {
 }
 
 type Probe struct {
-	Resource *edgeworksnov1.Networktest
-	NextRun  time.Time
+	NextRun    time.Time
+	Name       types.NamespacedName
+	Generation int64
 }
 
-func (p Probe) CalcNextRun() time.Time {
+func calcNextRun(i string) time.Time {
 	now := time.Now()
-	interval, _ := time.ParseDuration(p.Resource.Spec.Interval)
+	interval, _ := time.ParseDuration(i)
 	return now.Add(interval)
 }
 
@@ -136,8 +136,9 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		// Either add or replace probe
 		if probe, found := r.Tests.Load(req.NamespacedName.String()); !found {
 			probe := Probe{
-				Resource: test.DeepCopy(),
-				NextRun:  time.Now(),
+				Name:       req.NamespacedName,
+				Generation: test.Generation,
+				NextRun:    time.Now(),
 			}
 
 			r.Tests.Store(req.NamespacedName.String(), &probe)
@@ -145,10 +146,12 @@ func (r *NetworktestReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			r.TriggerChan <- struct{}{}
 		} else {
 			p := probe.(*Probe)
-			if p.Resource.ResourceVersion != test.ResourceVersion && !reflect.DeepEqual(p.Resource.Spec, test.Spec) {
-				p.Resource = test.DeepCopy()
+			if p.Generation != test.Generation {
+				p.NextRun = time.Now()
+				p.Generation = test.Generation
 				r.Tests.Swap(req.NamespacedName.String(), p)
 				ctrl.Log.V(1).Info(fmt.Sprintf("Updated %s", req.NamespacedName.String()))
+				r.TriggerChan <- struct{}{}
 			}
 		}
 	} else {
@@ -179,60 +182,72 @@ func (r *NetworktestReconciler) tester() {
 }
 
 func (r *NetworktestReconciler) performTest(p *Probe) {
-	res := p.Resource
-	ctrl.Log.V(1).Info(fmt.Sprintf("Testing %s", res.Name))
 
-	p.NextRun = p.CalcNextRun()
+	// Get resource, so we update the same as we are testing
+	var t edgeworksnov1.Networktest
+	if err := r.Get(context.Background(), p.Name, &t); err != nil {
+		ctrl.Log.Error(err, "failed to get Networktest")
+		return
+	}
+	ctrl.Log.V(1).Info("Testing", "namespace", t.Namespace, "name", t.Name, "generation", t.ObjectMeta.Generation)
 
-	var result testers.TestResult
-	if res.Spec.Http != nil {
-		result = testers.DoHttpTest(res)
-	} else if res.Spec.TCP != nil {
-		result = testers.DoTCPTest(res)
-	} else {
-		ctrl.Log.Info("Unknown probe type")
+	// Calculate next run time before doing t, to ensure we keep up with the interval start to start
+	p.NextRun = calcNextRun(t.Spec.Interval)
+	now := metav1.NewTime(time.Now())
+	currentResourceVersion := t.ResourceVersion
+
+	// Perform t
+	result, err := testers.PerformTest(&t)
+	if err != nil {
+		ctrl.Log.Info("Unknown probe type", "namespace", t.Namespace, "name", t.Name)
 		return
 	}
 
-	val := 0
-	if result.Success {
-		val = 1
+	// Update metrics
+	testResult.WithLabelValues(p.Name.Namespace, p.Name.Name, t.Spec.GetAddress()).Set(getCondValue(result))
+
+	// Get again in case updated in the mean time
+	if err := r.Get(context.Background(), p.Name, &t); err != nil {
+		ctrl.Log.Error(err, "failed to get Networktest")
+		return
 	}
-	testResult.WithLabelValues(p.Resource.Namespace, p.Resource.Name, p.Resource.Spec.GetAddress()).Set(float64(val))
 
-	var test edgeworksnov1.Networktest
-	if err := r.Get(context.Background(), types.NamespacedName{Namespace: res.ObjectMeta.Namespace, Name: res.ObjectMeta.Name}, &test); err == nil {
-		now := metav1.NewTime(time.Now())
-		test.Status.LastResult = result.String()
-		test.Status.Message = &result.Message
-		test.Status.LastRun = &now
+	if currentResourceVersion != t.ResourceVersion {
+		ctrl.Log.Info("Definition changed during testing. Skipping writing status.", "namespace", t.Namespace, "name", t.Name)
+	}
 
-		next := metav1.NewTime(p.NextRun)
-		test.Status.NextRun = &next
+	t.Status.LastResult = result.String()
+	t.Status.Message = &result.Message
+	t.Status.LastRun = &now
 
-		cond := metav1.Condition{
-			Type:               "Probe",
-			Reason:             "Probe",
-			Status:             getCondStatus(result),
-			ObservedGeneration: res.ObjectMeta.Generation,
-			LastTransitionTime: now,
-			Message:            *test.Status.Message,
-		}
+	next := metav1.NewTime(p.NextRun)
+	t.Status.NextRun = &next
 
-		if len(test.Status.Conditions) == 0 {
-			test.Status.Conditions = append(test.Status.Conditions, cond)
-		} else {
-			if test.Status.Conditions[len(test.Status.Conditions)-1].Status != cond.Status {
-				test.Status.Conditions = append(test.Status.Conditions, cond)
-			}
-		}
+	cond := metav1.Condition{
+		Type:               "Probe",
+		Reason:             "Probe",
+		Status:             getCondStatus(result),
+		ObservedGeneration: t.ObjectMeta.Generation,
+		LastTransitionTime: now,
+		Message:            *t.Status.Message,
+	}
 
-		if err = r.Status().Update(context.Background(), &test); err != nil {
-			ctrl.Log.Info("Could not update status: " + err.Error())
-		}
+	if len(t.Status.Conditions) == 0 {
+		t.Status.Conditions = append(t.Status.Conditions, cond)
 	} else {
-		ctrl.Log.Error(err, "Update test status: "+err.Error())
+		if t.Status.Conditions[len(t.Status.Conditions)-1].Status != cond.Status || t.Status.Conditions[len(t.Status.Conditions)-1].ObservedGeneration != cond.ObservedGeneration {
+			t.Status.Conditions = append(t.Status.Conditions, cond)
+		}
 	}
+
+	if t.Spec.HistoryLimit != 0 && len(t.Status.Conditions) > t.Spec.HistoryLimit {
+		t.Status.Conditions = t.Status.Conditions[len(t.Status.Conditions)-t.Spec.HistoryLimit:]
+	}
+
+	if err = r.Status().Update(context.Background(), &t); err != nil {
+		ctrl.Log.Info("Could not update status: "+err.Error(), "namespace", t.Namespace, "name", t.Name)
+	}
+
 }
 
 func getCondStatus(result testers.TestResult) metav1.ConditionStatus {
@@ -240,6 +255,15 @@ func getCondStatus(result testers.TestResult) metav1.ConditionStatus {
 		return "True"
 	} else {
 		return "False"
+	}
+}
+
+func getCondValue(result testers.TestResult) float64 {
+	switch result.Success {
+	case true:
+		return 1
+	default:
+		return 0
 	}
 }
 
