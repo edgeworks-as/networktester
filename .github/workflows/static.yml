@@ -35,12 +35,16 @@ jobs:
         run: |
           pwd
           ls -l
+          mkdir pages
+          cp README.md pages/
+          ls -l pages/
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '*.md'
+          path: './pages'
+          
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
